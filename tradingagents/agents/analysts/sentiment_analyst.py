@@ -39,8 +39,41 @@ from tradingagents.agents.utils.structured import (
     bind_structured,
     invoke_structured_or_freetext,
 )
-from tradingagents.dataflows.reddit import fetch_reddit_posts
-from tradingagents.dataflows.stocktwits import fetch_stocktwits_messages
+
+
+def _is_a_share(symbol: str) -> bool:
+    """Check if symbol is an A-share stock."""
+    s = symbol.strip().upper()
+    if "." in s:
+        return s.split(".")[-1] in ("SS", "SH", "SZ")
+    code = s.replace("SH", "").replace("SZ", "")
+    return code.isdigit() and len(code) == 6
+
+
+# Lazy imports to avoid hard failures when modules are missing
+def _fetch_stocktwits_safe(ticker: str, limit: int = 30) -> str:
+    try:
+        from tradingagents.dataflows.stocktwits import fetch_stocktwits_messages
+        return fetch_stocktwits_messages(ticker, limit=limit)
+    except Exception as e:
+        return f"StockTwits unavailable: {e}"
+
+
+def _fetch_reddit_safe(ticker: str) -> str:
+    try:
+        from tradingagents.dataflows.reddit import fetch_reddit_posts
+        return fetch_reddit_posts(ticker)
+    except Exception as e:
+        return f"Reddit unavailable: {e}"
+
+
+def _fetch_searxng_news(ticker: str, start_date: str, end_date: str) -> str:
+    """Fetch Chinese news for A-share stocks via SearXNG."""
+    try:
+        from tradingagents.dataflows.searxng_news import get_news_searxng
+        return get_news_searxng(ticker, max_results=15)
+    except Exception as e:
+        return f"SearXNG news unavailable: {e}"
 
 
 def _seven_days_back(trade_date: str) -> str:
@@ -66,9 +99,22 @@ def create_sentiment_analyst(llm):
         # Pre-fetch all three sources. Each fetcher degrades gracefully and
         # returns a string (no exceptions surface from here), so the LLM
         # always sees something — either real data or a clear placeholder.
+        #
+        # For A-share stocks, use SearXNG Chinese news instead of
+        # StockTwits/Reddit which don't cover Chinese markets.
         news_block = get_news.func(ticker, start_date, end_date)
-        stocktwits_block = fetch_stocktwits_messages(ticker, limit=30)
-        reddit_block = fetch_reddit_posts(ticker)
+
+        if _is_a_share(ticker):
+            # A-share: supplement with Chinese news from SearXNG
+            searxng_block = _fetch_searxng_news(ticker, start_date, end_date)
+            stocktwits_block = f"StockTwits: No data available for A-share stock {ticker}."
+            reddit_block = f"Reddit: No data available for A-share stock {ticker}."
+            # Merge SearXNG news into the news block for richer context
+            if searxng_block and "unavailable" not in searxng_block.lower():
+                news_block = f"{news_block}\n\n--- Chinese Financial News (SearXNG) ---\n{searxng_block}"
+        else:
+            stocktwits_block = _fetch_stocktwits_safe(ticker, limit=30)
+            reddit_block = _fetch_reddit_safe(ticker)
 
         system_message = _build_system_message(
             ticker=ticker,
@@ -132,8 +178,9 @@ def _build_system_message(
 
 ## Data sources (pre-fetched, in this prompt)
 
-### News headlines — Yahoo Finance, past 7 days
-Institutional framing. Fact-driven, slower-moving signal.
+### News headlines — past 7 days
+Institutional and financial news framing. Fact-driven, slower-moving signal.
+For A-share stocks, this includes Chinese financial news from SearXNG (东方财富, 同花顺, 新浪财经, etc.).
 
 <start_of_news>
 {news_block}
@@ -141,13 +188,15 @@ Institutional framing. Fact-driven, slower-moving signal.
 
 ### StockTwits messages — retail-trader social platform indexed by cashtag
 Fast-moving signal. Each message carries a user-labeled sentiment tag (Bullish / Bearish / no-label) plus the message body.
+Note: For A-share stocks, StockTwits data is typically unavailable.
 
 <start_of_stocktwits>
 {stocktwits_block}
 <end_of_stocktwits>
 
 ### Reddit posts — r/wallstreetbets, r/stocks, r/investing (past 7 days)
-Community discussion. Engagement signal via upvote score and comment count. Subreddit character matters (r/wallstreetbets is often contrarian/exuberant; r/stocks more measured; r/investing longer-term).
+Community discussion. Engagement signal via upvote score and comment count.
+Note: For A-share stocks, Reddit data is typically unavailable.
 
 <start_of_reddit>
 {reddit_block}
