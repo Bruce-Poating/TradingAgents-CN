@@ -34,7 +34,8 @@ def _extract_code(symbol: str) -> str:
 
 def get_news_searxng(
     ticker: Annotated[str, "ticker symbol"],
-    curr_date: Annotated[str, "current date YYYY-mm-dd"] = None,
+    start_date: Annotated[str, "start date"] = None,
+    end_date: Annotated[str, "end date"] = None,
     max_results: Annotated[int, "max articles"] = 10,
 ) -> str:
     """Get stock-related news using SearXNG search.
@@ -166,9 +167,11 @@ def get_news_searxng(
 
 def get_global_news_searxng(
     curr_date: Annotated[str, "current date"] = None,
-    max_results: Annotated[int, "max articles"] = 10,
+    look_back_days: Annotated[int, "days to look back"] = None,
+    limit: Annotated[int, "max articles"] = None,
 ) -> str:
     """Get global Chinese financial news using SearXNG."""
+    max_results = limit or 10
     
     queries = [
         "A股 大盘 今日行情",
