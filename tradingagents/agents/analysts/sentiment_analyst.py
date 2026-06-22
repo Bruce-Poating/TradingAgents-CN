@@ -76,6 +76,15 @@ def _fetch_searxng_news(ticker: str, start_date: str, end_date: str) -> str:
         return f"SearXNG news unavailable: {e}"
 
 
+def _fetch_guba_sentiment(ticker: str) -> str:
+    """Fetch EastMoney Guba forum sentiment for A-share stocks."""
+    try:
+        from tradingagents.dataflows.guba_sentiment import get_guba_sentiment_for_llm
+        return get_guba_sentiment_for_llm(ticker)
+    except Exception as e:
+        return f"Guba sentiment unavailable: {e}"
+
+
 def _seven_days_back(trade_date: str) -> str:
     return (datetime.strptime(trade_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
 
@@ -105,13 +114,16 @@ def create_sentiment_analyst(llm):
         news_block = get_news.func(ticker, start_date, end_date)
 
         if _is_a_share(ticker):
-            # A-share: supplement with Chinese news from SearXNG
+            # A-share: use Guba forum sentiment + SearXNG Chinese news
+            guba_block = _fetch_guba_sentiment(ticker)
             searxng_block = _fetch_searxng_news(ticker, start_date, end_date)
             stocktwits_block = f"StockTwits: No data available for A-share stock {ticker}."
             reddit_block = f"Reddit: No data available for A-share stock {ticker}."
-            # Merge SearXNG news into the news block for richer context
+            # Merge Chinese data into the news block
+            chinese_data = "\n\n--- 散户论坛情绪 (东方财富股吧) ---\n" + guba_block
             if searxng_block and "unavailable" not in searxng_block.lower():
-                news_block = f"{news_block}\n\n--- Chinese Financial News (SearXNG) ---\n{searxng_block}"
+                chinese_data += "\n\n--- 中文财经新闻 (SearXNG) ---\n" + searxng_block
+            news_block = f"{news_block}\n{chinese_data}"
         else:
             stocktwits_block = _fetch_stocktwits_safe(ticker, limit=30)
             reddit_block = _fetch_reddit_safe(ticker)
