@@ -29,6 +29,15 @@ from .y_finance import (
     get_YFin_data_online,
 )
 from .yfinance_news import get_global_news_yfinance, get_news_yfinance
+from .tdx_utils import get_stock_data_tdx, get_stock_stats_indicators_tdx
+from .akshare_utils import (
+    get_fundamentals_akshare,
+    get_balance_sheet_akshare,
+    get_cashflow_akshare,
+    get_income_statement_akshare,
+    get_insider_transactions_akshare,
+)
+from .searxng_news import get_news_searxng, get_global_news_searxng
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +91,9 @@ VENDOR_LIST = [
     "fred",
     "polymarket",
     "alpha_vantage",
+    "tdx",
+    "akshare",
+    "searxng",
 ]
 
 # Optional enrichment categories. These add macro/event context to the news
@@ -97,41 +109,50 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
+        "tdx": get_stock_data_tdx,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
+        "tdx": get_stock_stats_indicators_tdx,
     },
     # fundamental_data
     "get_fundamentals": {
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "yfinance": get_yfinance_fundamentals,
+        "akshare": get_fundamentals_akshare,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
+        "akshare": get_balance_sheet_akshare,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
+        "akshare": get_cashflow_akshare,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
+        "akshare": get_income_statement_akshare,
     },
     # news_data
     "get_news": {
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
+        "searxng": get_news_searxng,
     },
     "get_global_news": {
         "yfinance": get_global_news_yfinance,
         "alpha_vantage": get_alpha_vantage_global_news,
+        "searxng": get_global_news_searxng,
     },
     "get_insider_transactions": {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
+        "akshare": get_insider_transactions_akshare,
     },
     # macro_data
     "get_macro_indicators": {
