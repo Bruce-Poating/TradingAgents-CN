@@ -110,11 +110,11 @@ def get_stock_data_tdx(
     if not rows:
         raise NoMarketDataError(symbol, tdx_code, "no parseable kline data")
     
-    df = pd.DataFrame(rows).set_index("Date")
-    
-    # Strip timezone info for consistent comparison
-    if df.index.tz is not None:
-        df.index = df.index.tz_localize(None)
+    df = pd.DataFrame(rows)
+    # Convert to datetime, handling tz-aware strings
+    dates = pd.to_datetime(df["Date"], utc=True)
+    df["Date"] = dates.dt.tz_localize(None)  # Strip timezone
+    df = df.set_index("Date")
     
     # Filter by date range
     start_dt = pd.to_datetime(start_date)
@@ -169,9 +169,10 @@ def get_stock_stats_indicators_tdx(
     if not rows:
         raise NoMarketDataError(symbol, tdx_code, "no data for indicator calc")
     
-    df = pd.DataFrame(rows).set_index("Date")
-    if df.index.tz is not None:
-        df.index = df.index.tz_localize(None)
+    df = pd.DataFrame(rows)
+    dates = pd.to_datetime(df["Date"], utc=True)
+    df["Date"] = dates.dt.tz_localize(None)
+    df = df.set_index("Date")
     
     try:
         ss = wrap(df)
